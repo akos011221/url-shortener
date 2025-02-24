@@ -47,7 +47,7 @@ func main() {
 
 	// Wrap the router with middleware
 	handler := api.LoggingMiddleware(router)
-	handler = api.AuthMiddleware(handler)
+	handler = api.AuthMiddleware(db, handler)
 	handler = api.RateLimitMiddleware(handler)
 
 	// Start the server
