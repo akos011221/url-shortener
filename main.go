@@ -52,7 +52,7 @@ func main() {
 
 	// Start the server
 	server := &http.Server{
-		Addr:	cfg.ServerAddress,
+		Addr:    cfg.ServerAddress,
 		Handler: handler,
 	}
 
