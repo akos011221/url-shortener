@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: url-shortener
+  labels:
+    app: url-shortener
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: url-shortener
+  template:
+    metadata:
+      labels:
+        app: url-shortener
+  spec:
+    containers:
+      - name: url-shortener
+        image: orbanakos2312/url-shortener:v0.1.0-alpha
+        ports:
+          - containerPort: 8080
+        env:
+          - name: ENV
+            value: "production"
+          - name: SERVER_ADDRESS
+            value: ":8080"
+          - name: DATABASE_URL
+            value: ""
