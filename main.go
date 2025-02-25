@@ -53,8 +53,8 @@ func main() {
 
 	// Wrap the protected router with middleware
 	protectedHandler := api.LoggingMiddleware(protectedRouter)
-	protectedHandler = api.AuthMiddleware(db, protectedHandler)
 	protectedHandler = api.RateLimitMiddleware(protectedHandler)
+	protectedHandler = api.AuthMiddleware(db, protectedHandler)
 
 	// Mount the protected router under a prefix
 	router.Handle("/api/", http.StripPrefix("/api", protectedHandler))

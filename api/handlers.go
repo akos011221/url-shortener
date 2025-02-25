@@ -86,6 +86,17 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	// Get analytics data
 	analytics, err := h.Analytics.GetAnalytics(r.Context(), shortCode)
 	if err != nil {
+		// If no clicks are found, return a 200 OK response with zero clicks
+		if err.Error() == "No clicks found" {
+			utils.WriteJSON(w, http.StatusOK, models.GetAnalyticsResponse{
+				ShortCode: shortCode,
+				Clicks: 0,
+				Details: []models.Click{},
+			})
+			return
+		}
+
+		// For other errors, return a 500 Internal Server Error
 		utils.WriteError(w, http.StatusInternalServerError, "Failed to retrieve analytics")
 		return
 	}
