@@ -16,7 +16,7 @@ spec:
   spec:
     containers:
       - name: url-shortener
-        image: orbanakos2312/url-shortener:v0.1.0-alpha
+        image: orbanakos2312/url-shortener:latest
         ports:
           - containerPort: 8080
         env:
