@@ -8,11 +8,12 @@ import (
 )
 
 type Database interface {
-	SaveURL(ctx context.Context, shortCode, longURL string) error
+	SaveURL(ctx context.Context, shortCode, longURL, tenantID string) error
 	GetURL(ctx context.Context, shortCode string) (string, error)
 	SaveClick(ctx context.Context, click models.Click) error
 	GetClicks(ctx context.Context, shortCode string) ([]models.Click, error)
 	GetTenantByAPIKey(ctx context.Context, apiKey string) (*models.Tenant, error)
+	GetURLTenantID(ctx context.Context, shortCode string) (string, error)
 	Close() error
 }
 
@@ -20,6 +21,7 @@ type InMemoryDatabase struct {
 	urls map[string]string // shortCode -> longURL
 	clicks map[string][]models.Click // shortCode -> []Click
 	tenants map[string]models.Tenant // apiKey -> Tenant
+	tenantURLs map[string][]string // tenantID -> []shortCode
 }
 
 func NewDatabase(databaseURL string) (Database, error) {
@@ -33,11 +35,16 @@ func NewDatabase(databaseURL string) (Database, error) {
 		urls: make(map[string]string),
 		clicks: make(map[string][]models.Click),
 		tenants: tenants,
+		tenantURLs: make(map[string][]string),
 	}, nil
 }
 
-func (db *InMemoryDatabase) SaveURL(ctx context.Context, shortCode, longURL string) error {
+func (db *InMemoryDatabase) SaveURL(ctx context.Context, shortCode, longURL, tenantID string) error {
 	db.urls[shortCode] = longURL
+	if tenantID != "" {
+		// Associate the short URL with the tenant (if provided)
+		db.tenantURLs[tenantID] = append(db.tenantURLs[tenantID], shortCode)
+	}
 	return nil
 }
 
@@ -68,6 +75,25 @@ func (db *InMemoryDatabase) GetTenantByAPIKey(ctx context.Context, apiKey string
 		return nil, errors.New("Invalid API key")
 	}
 	return &tenant, nil
+}
+
+func (db *InMemoryDatabase) GetURLTenantID(ctx context.Context, shortCode string) (string, error) {
+	// Check if the short URL exists
+	if _, ok := db.urls[shortCode]; !ok {
+		return "", errors.New("URL not found")
+	}
+
+	// Check if the short URL is associated with a tenant
+	for tenantID, shortCodes := range db.tenantURLs {
+		for _, sc := range shortCodes {
+			if sc == shortCode {
+				return tenantID, nil
+			}
+		}
+	}
+
+	// If no tenant is associated, return an empty string
+	return "", nil
 }
 
 func (db *InMemoryDatabase) Close() error {

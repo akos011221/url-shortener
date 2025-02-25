@@ -38,16 +38,29 @@ func main() {
 		Analytics: analyticsService,
 	}
 
-	// Create router
+	// Create router for public routes
 	router := http.NewServeMux()
 
-	// Register routes
-	router.HandleFunc("POST /shorten", handlers.CreateShortURL)
-	router.HandleFunc("GET /{shortCode}", handlers.Redirect)
+	// Public routes (no API key required)
+	router.HandleFunc("GET /{shortCode}", handlers.Redirect) // Redirect short URLs
 
-	// Wrap the router with middleware
+	// Create router for protected routes
+	protectedRouter := http.NewServeMux()
+
+	// Protected routes (no API key required)
+	protectedRouter.HandleFunc("POST /shorten", handlers.CreateShortURL) // Create short URL
+	protectedRouter.HandleFunc("GET /analytics/{shortCode}", handlers.GetAnalytics) // Get analytics
+
+	// Wrap the protected router with middleware
+	protectedHandler := api.LoggingMiddleware(protectedRouter)
+	protectedHandler = api.AuthMiddleware(db, protectedHandler)
+	protectedHandler = api.RateLimitMiddleware(protectedHandler)
+
+	// Mount the protected router under a prefix
+	router.Handle("/api/", http.StripPrefix("/api", protectedHandler))
+
+	// Wrap the public router with logging and rate limit middleware
 	handler := api.LoggingMiddleware(router)
-	handler = api.AuthMiddleware(db, handler)
 	handler = api.RateLimitMiddleware(handler)
 
 	// Start the server
