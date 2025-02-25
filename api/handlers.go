@@ -19,13 +19,13 @@ func (h *Handlers) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var req models.CreateShortURLRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid request body")
+		utils.WriteError(w, http.StatusBadRequest, utils.ErrInvalidRequestBody)
 		return
 	}
 
 	// Validate request
 	if req.LongURL == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Long URL is required")
+		utils.WriteError(w, http.StatusBadRequest, utils.ErrLongURLRequired)
 		return
 	}
 
@@ -35,7 +35,7 @@ func (h *Handlers) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	// Create short URL
 	shortURL, err := h.Shortener.CreateShortURL(r.Context(), req.LongURL, tenantID)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to create short URL")
+		utils.WriteError(w, http.StatusInternalServerError, utils.ErrFailedToCreateURL)
 		return
 	}
 
@@ -51,7 +51,7 @@ func (h *Handlers) Redirect(w http.ResponseWriter, r *http.Request) {
 	// Get long URL
 	longURL, err := h.Shortener.GetLongURL(r.Context(), shortCode)
 	if err != nil {
-		utils.WriteError(w, http.StatusNotFound, "Short URL not found")
+		utils.WriteError(w, http.StatusNotFound, utils.ErrURLNotFound)
 		return
 	}
 
@@ -73,13 +73,13 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	// Get the short URL's tenant ID (if any)
 	urlTenantID, err := h.Shortener.GetURLTenantID(r.Context(), shortCode)
 	if err != nil {
-		utils.WriteError(w, http.StatusNotFound, "Short URL not found")
+		utils.WriteError(w, http.StatusNotFound, utils.ErrURLNotFound)
 		return
 	}
 
 	// Ensure the tenant is authorized to access the analytics
 	if urlTenantID != "" && urlTenantID != tenantID {
-		utils.WriteError(w, http.StatusForbidden, "You are not authorized to access the short URL's analytics")
+		utils.WriteError(w, http.StatusForbidden, utils.ErrUnauthorizedAccess)
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	analytics, err := h.Analytics.GetAnalytics(r.Context(), shortCode)
 	if err != nil {
 		// If no clicks are found, return a 200 OK response with zero clicks
-		if err.Error() == "No clicks found" {
+		if err.Error() == utils.ErrNoClicksFound {
 			utils.WriteJSON(w, http.StatusOK, models.GetAnalyticsResponse{
 				ShortCode: shortCode,
 				Clicks: 0,
@@ -97,7 +97,7 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// For other errors, return a 500 Internal Server Error
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to retrieve analytics")
+		utils.WriteError(w, http.StatusInternalServerError, utils.ErrFailedToRetrieveData)
 		return
 	}
 

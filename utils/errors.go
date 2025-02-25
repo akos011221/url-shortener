@@ -5,6 +5,18 @@ import (
 	"net/http"
 )
 
+var (
+	ErrInvalidRequestBody	=	"Invalid request body"
+	ErrLongURLRequired	= 	"Long URL is required"
+	ErrAPIKeyRequired	=	"API key required"
+	ErrInvalidAPIKey	=	"Invalid API key"
+	ErrURLNotFound		=	"Short URL not found"
+	ErrUnauthorizedAccess	=	"You are not authorized to access the short URL's analytics"
+	ErrNoClicksFound	=	"No clicks found"
+	ErrFailedToCreateURL	=	"Failed to create short URL"
+	ErrFailedToRetrieveData =	"Failed to retrieve analytics"
+)
+
 // WriteError writes an error response in JSON format.
 func WriteError(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")

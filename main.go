@@ -48,7 +48,7 @@ func main() {
 	protectedRouter := http.NewServeMux()
 
 	// Protected routes (no API key required)
-	protectedRouter.HandleFunc("POST /shorten", handlers.CreateShortURL) // Create short URL
+	protectedRouter.HandleFunc("POST /shorten", handlers.CreateShortURL)            // Create short URL
 	protectedRouter.HandleFunc("GET /analytics/{shortCode}", handlers.GetAnalytics) // Get analytics
 
 	// Wrap the protected router with middleware
