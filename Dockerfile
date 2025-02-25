@@ -6,9 +6,9 @@ COPY go.mod ./
 
 RUN go mod download
 
-COPY *.go ./api ./service ./models ./storage ./utils ./config ./
+COPY COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o ./
+RUN CGO_ENABLED=0 GOOS=linux go build -o /url-shortener
 
 ENV ENV="production"
 ENV SERVER_ADDRESS=:8080
