@@ -26,14 +26,14 @@ func AuthMiddleware(db storage.Database, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		apiKey := r.Header.Get("x-api-key")
 		if apiKey == "" {
-			utils.WriteError(w, http.StatusUnauthorized, "API key required")
+			utils.WriteError(w, http.StatusUnauthorized, utils.ErrAPIKeyRequired)
 			return
 		}
 
 		// Validate API key and get the tenant
 		tenant, err := db.GetTenantByAPIKey(r.Context(), apiKey)
 		if err != nil {
-			utils.WriteError(w, http.StatusUnauthorized, "Invalid API key")
+			utils.WriteError(w, http.StatusUnauthorized, utils.ErrInvalidAPIKey)
 			return
 		}
 
