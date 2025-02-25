@@ -52,9 +52,9 @@ func main() {
 	protectedRouter.HandleFunc("GET /analytics/{shortCode}", handlers.GetAnalytics) // Get analytics
 
 	// Wrap the protected router with middleware
-	protectedHandler := api.LoggingMiddleware(protectedRouter)
+	protectedHandler := api.AuthMiddleware(db, protectedRouter)
 	protectedHandler = api.RateLimitMiddleware(protectedHandler)
-	protectedHandler = api.AuthMiddleware(db, protectedHandler)
+	protectedHandler = api.LoggingMiddleware(protectedHandler)
 
 	// Mount the protected router under a prefix
 	router.Handle("/api/", http.StripPrefix("/api", protectedHandler))

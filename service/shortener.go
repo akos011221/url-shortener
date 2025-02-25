@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math/rand"
 
 	"github.com/akos011221/url-shortener/models"
 	"github.com/akos011221/url-shortener/storage"
@@ -43,8 +44,16 @@ func (s *Shortener) GetURLTenantID(ctx context.Context, shortCode string) (strin
 	return s.db.GetURLTenantID(ctx, shortCode)
 }
 
-// generateShortCode generates a unique short code.
+// // generateShortCode generates a unique short code using Base62 encoding.
 func generateShortCode() string {
-	// TODO: Implement Base62 encoding or use a UUID library
-	return "abc123"
+	const charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	const codeLength = 6
+
+	// Generate a random short code
+	code := make([]byte, codeLength)
+	for i := range code {
+		code[i] = charset[rand.Intn(len(charset))]
+	}
+
+	return string(code)
 }
