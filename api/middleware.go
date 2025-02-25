@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"context"
 
 	"github.com/akos011221/url-shortener/utils"
 	"github.com/akos011221/url-shortener/storage"
@@ -29,7 +30,7 @@ func AuthMiddleware(db storage.Database, next http.Handler) http.Handler {
 			return
 		}
 
-		// Validate API key
+		// Validate API key and get the tenant
 		tenant, err := db.GetTenantByAPIKey(r.Context(), apiKey)
 		if err != nil {
 			utils.WriteError(w, http.StatusUnauthorized, "Invalid API key")
@@ -38,9 +39,12 @@ func AuthMiddleware(db storage.Database, next http.Handler) http.Handler {
 
 		// Log the tenant for debugging
 		log.Printf("Authenticated tenant: %s", tenant.Name)
+		
+		// Add tenant ID to the request context
+		ctx := context.WithValue(r.Context(), "tenantID", tenant.ID)
 
 		// Call the next handler
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

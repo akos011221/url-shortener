@@ -29,19 +29,8 @@ func (h *Handlers) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract API key from request headers
-	apiKey := r.Header.Get("x-api-key")
-	var tenantID string
-
-	// If API key is provided, validate it and get the tenant ID
-	if apiKey != "" {
-		tenant, err := h.Shortener.GetTenantByAPIKey(r.Context(), apiKey)
-		if err != nil {
-			utils.WriteError(w, http.StatusUnauthorized, "Invalid API key")
-			return
-		}
-		tenantID = tenant.ID
-	}
+	// Extract tenant ID from context (set by AuthMiddleware)
+	tenantID := r.Context().Value("tenantID").(string)
 
 	// Create short URL
 	shortURL, err := h.Shortener.CreateShortURL(r.Context(), req.LongURL, tenantID)
@@ -78,19 +67,8 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	// Extract short code from URL path
 	shortCode := r.PathValue("shortCode")
 
-	// Extract API key from request headers
-	apiKey := r.Header.Get("x-api-key")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "API key required")
-		return
-	}
-
-	// Validate API key and get the tenant
-	tenant, err := h.Shortener.GetTenantByAPIKey(r.Context(), apiKey)
-	if err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Invalid API key")
-		return
-	}
+	// Extract tenant ID from context (set by AuthMiddleware)
+	tenantID := r.Context().Value("tenantID").(string)
 
 	// Get the short URL's tenant ID (if any)
 	urlTenantID, err := h.Shortener.GetURLTenantID(r.Context(), shortCode)
@@ -100,7 +78,7 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure the tenant is authorized to access the analytics
-	if urlTenantID != "" && urlTenantID != tenant.ID {
+	if urlTenantID != "" && urlTenantID != tenantID {
 		utils.WriteError(w, http.StatusForbidden, "You are not authorized to access the short URL's analytics")
 		return
 	}
