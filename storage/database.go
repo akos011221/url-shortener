@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/akos011221/url-shortener/models"
+	"github.com/akos011221/url-shortener/utils"
 )
 
 type Database interface {
