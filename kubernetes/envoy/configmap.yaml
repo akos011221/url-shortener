@@ -18,27 +18,36 @@ data:
                     "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
                     stat_prefix: ingress_http
                     route_config:
-                      virtual_config:
-                        virtual_hosts:
-                          - name: url-shortener
-                            domains: ["*"]
-                            routes:
-                              - match:
-                                  prefix: "/"
-                                route:
-                                  cluster: url-shortener
+                      name: local_route
+                      virtual_hosts:
+                        - name: url-shortener
+                          domains: ["*"]
+                          routes:
+                            - match:
+                                prefix: "/"
+                              route:
+                                cluster: url-shortener
                     http_filters:
                       - name: envoy.filters.http.router
-    clusters:
-      - name: url-shortener
-        connect_timeout: 0.25s
-        type: STRICT_DNS
-        load_assignment:
-          cluster_name: url-shortener
-          endpoints:
-            - lb_endpoints:
-                - endpoint:
-                    address:
-                      socket_address:
-                        address: url-shortener.default.svc.cluster.local
-                        port_value: 8080
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      clusters:
+        - name: url-shortener
+          connect_timeout: 0.25s
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: url-shortener
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: url-shortener.default.svc.cluster.local
+                          port_value: 80
+    admin:
+      access_log_path: /tmp/admin_access.log
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9901
