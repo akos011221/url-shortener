@@ -90,8 +90,8 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == utils.ErrNoClicksFound {
 			utils.WriteJSON(w, http.StatusOK, models.GetAnalyticsResponse{
 				ShortCode: shortCode,
-				Clicks: 0,
-				Details: []models.Click{},
+				Clicks:    0,
+				Details:   []models.Click{},
 			})
 			return
 		}
