@@ -21,10 +21,10 @@ spec:
             - containerPort: 80
             - containerPort: 443
           volumeMounts:
-            - name: envoy-config
-              mountPath: /etc/envoy/envoy.yaml
-              subPath: envoy.yaml
-    volumes:
-      - name: envoy-config
-        configMap:
-          name: envoy-config
+            - name: envoy-config      
+              mountPath: /etc/envoy
+              readOnly: true
+      volumes:
+        - name: envoy-config          
+          configMap:
+            name: envoy-config
