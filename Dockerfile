@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 FROM golang:1.23.2
 
 WORKDIR /app
@@ -10,7 +8,7 @@ RUN go mod download
 
 COPY *.go ./api ./service ./models ./storage ./utils ./config ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /url-shortener
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./
 
 ENV ENV="production"
 ENV SERVER_ADDRESS=:8080
