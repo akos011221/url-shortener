@@ -19,10 +19,10 @@ type Database interface {
 }
 
 type InMemoryDatabase struct {
-	urls map[string]string // shortCode -> longURL
-	clicks map[string][]models.Click // shortCode -> []Click
-	tenants map[string]models.Tenant // apiKey -> Tenant
-	tenantURLs map[string][]string // tenantID -> []shortCode
+	urls       map[string]string         // shortCode -> longURL
+	clicks     map[string][]models.Click // shortCode -> []Click
+	tenants    map[string]models.Tenant  // apiKey -> Tenant
+	tenantURLs map[string][]string       // tenantID -> []shortCode
 }
 
 func NewDatabase(databaseURL string) (Database, error) {
@@ -33,9 +33,9 @@ func NewDatabase(databaseURL string) (Database, error) {
 
 	// TODO: Connect to a real database (e.g., PostgreSQL, Redis)
 	return &InMemoryDatabase{
-		urls: make(map[string]string),
-		clicks: make(map[string][]models.Click),
-		tenants: tenants,
+		urls:       make(map[string]string),
+		clicks:     make(map[string][]models.Click),
+		tenants:    tenants,
 		tenantURLs: make(map[string][]string),
 	}, nil
 }
