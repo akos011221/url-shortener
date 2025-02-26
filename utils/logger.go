@@ -5,11 +5,7 @@ import (
 	"os"
 )
 
-type Logger struct {
-	*log.Logger
-}
-
-func InitLogger(env string) *Logger {
+func InitLogger(env string) {
 	if env == "production" {
 		log.SetOutput(os.Stdout)
 		log.SetFlags(log.LstdFlags)
