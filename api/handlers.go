@@ -15,6 +15,7 @@ type Handlers struct {
 	Analytics *service.Analytics
 }
 
+
 // CreateShortURL handles requests to create a short URL.
 func (h *Handlers) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
@@ -31,7 +32,10 @@ func (h *Handlers) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract tenant ID from context (set by AuthMiddleware)
-	tenantID := r.Context().Value("tenantID").(string)
+	tenantID, ok := r.Context().Value("tenantID").(string)
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, utils.ErrUnauthorizedAccess)
+	}
 
 	// Create short URL
 	shortURL, err := h.Shortener.CreateShortURL(r.Context(), req.LongURL, tenantID)
