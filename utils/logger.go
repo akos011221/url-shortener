@@ -5,12 +5,22 @@ import (
 	"os"
 )
 
-func InitLogger(env string) {
-	if env == "production" {
-		log.SetOutput(os.Stdout)
-		log.SetFlags(log.LstdFlags)
-	} else {
-		log.SetOutput(os.Stdout)
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
+type Logger struct {
+	*log.Logger
+}
+
+func InitLogger(env string) *Logger {
+	l := log.New(os.Stdout, "", log.LstdFlags)
+	if env != "production" {
+		l.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
+	return &Logger{l}
+}
+
+func (l *Logger) Info(msg string) {
+	l.Printf("[INFO] %s", msg)
+}
+
+func (l *Logger) Error(msg string) {
+	l.Printf("[ERROR] %s", msg)
 }
