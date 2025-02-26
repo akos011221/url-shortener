@@ -1,0 +1,838 @@
+./config/config.go
+==== START OF ./config/config.go ====
+package config
+
+import "os"
+
+type Config struct {
+	Env	string
+	ServerAddress string
+	DatabaseURL string
+}
+
+func LoadConfig() (*Config, error) {
+	return &Config{
+		Env:	os.Getenv("ENV"),
+		ServerAddress: os.Getenv("SERVER_ADDRESS"),
+		DatabaseURL: os.Getenv("DATABASE_URL"),
+	}, nil
+}
+\n==== END OF ./config/config.go ====\n
+./utils/logger.go
+==== START OF ./utils/logger.go ====
+package utils
+
+import (
+	"log"
+	"os"
+)
+
+func InitLogger(env string) {
+	if env == "production" {
+		log.SetOutput(os.Stdout)
+		log.SetFlags(log.LstdFlags)
+	} else {
+		log.SetOutput(os.Stdout)
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+	}
+}
+\n==== END OF ./utils/logger.go ====\n
+./utils/errors.go
+==== START OF ./utils/errors.go ====
+package utils
+
+import (
+	"encoding/json"
+	"net/http"
+)
+
+var (
+	ErrInvalidRequestBody	=	"Invalid request body"
+	ErrLongURLRequired	= 	"Long URL is required"
+	ErrAPIKeyRequired	=	"API key required"
+	ErrInvalidAPIKey	=	"Invalid API key"
+	ErrURLNotFound		=	"Short URL not found"
+	ErrUnauthorizedAccess	=	"You are not authorized to access the short URL's analytics"
+	ErrNoClicksFound	=	"No clicks found"
+	ErrFailedToCreateURL	=	"Failed to create short URL"
+	ErrFailedToRetrieveData =	"Failed to retrieve analytics"
+)
+
+// WriteError writes an error response in JSON format.
+func WriteError(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// WriteJSON writes a JSON response.
+func WriteJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(data)
+}
+\n==== END OF ./utils/errors.go ====\n
+./models/models.go
+==== START OF ./models/models.go ====
+package models
+
+import (
+	"time"
+)
+
+// Tenant represents a user or organization using the URL shortener.
+type Tenant struct {
+	ID	string	`json:"id"`
+	Name	string `json:"name"`
+	APIKey string	`json:"apiKey"`
+}
+
+// URL represents a shortened URL and its metadata.
+type URL struct {
+	ShortCode	string	`json:"shortCode"`
+	LongURL		string	`json:"longURL"`
+	CreatedAt 	time.Time `json:"createdAt"`
+	TenantID	string	`json:"tenantId"`
+}
+
+// Click represents a click on a short URL.
+type Click struct {
+	ShortCode	string	`json:"shortCode"`
+	IPAddress	string	`json:"ipAddress"`
+	UserAgent	string	`json:"userAgent"`
+	TimeStamp	time.Time `json:"timestamp"`
+}
+
+// CreateShortURLRequest represents a request body for creating a short URL.
+type CreateShortURLRequest struct {
+	LongURL string `json:"longUrl"`
+}
+
+type CreateShortURLResponse struct {
+	ShortURL string `json:"shortUrl"`
+}
+
+// GetAnalyticsResponse represents the response body for analytics data.
+type GetAnalyticsResponse struct {
+	ShortCode string `json:"shortCode"`
+	Clicks	int	`json:"clicks"`
+	Details	[]Click	`json:"details"`
+}
+\n==== END OF ./models/models.go ====\n
+./storage/database.go
+==== START OF ./storage/database.go ====
+package storage
+
+import (
+	"context"
+	"errors"
+
+	"github.com/akos011221/url-shortener/models"
+	"github.com/akos011221/url-shortener/utils"
+)
+
+type Database interface {
+	SaveURL(ctx context.Context, shortCode, longURL, tenantID string) error
+	GetURL(ctx context.Context, shortCode string) (string, error)
+	SaveClick(ctx context.Context, click models.Click) error
+	GetClicks(ctx context.Context, shortCode string) ([]models.Click, error)
+	GetTenantByAPIKey(ctx context.Context, apiKey string) (*models.Tenant, error)
+	GetURLTenantID(ctx context.Context, shortCode string) (string, error)
+	Close() error
+}
+
+type InMemoryDatabase struct {
+	urls map[string]string // shortCode -> longURL
+	clicks map[string][]models.Click // shortCode -> []Click
+	tenants map[string]models.Tenant // apiKey -> Tenant
+	tenantURLs map[string][]string // tenantID -> []shortCode
+}
+
+func NewDatabase(databaseURL string) (Database, error) {
+	// Initialize in-memory data
+	tenants := map[string]models.Tenant{
+		"api-key-123": {ID: "1", Name: "Tenant A", APIKey: "api-key-123"},
+	}
+
+	// TODO: Connect to a real database (e.g., PostgreSQL, Redis)
+	return &InMemoryDatabase{
+		urls: make(map[string]string),
+		clicks: make(map[string][]models.Click),
+		tenants: tenants,
+		tenantURLs: make(map[string][]string),
+	}, nil
+}
+
+func (db *InMemoryDatabase) SaveURL(ctx context.Context, shortCode, longURL, tenantID string) error {
+	db.urls[shortCode] = longURL
+	if tenantID != "" {
+		// Associate the short URL with the tenant (if provided)
+		db.tenantURLs[tenantID] = append(db.tenantURLs[tenantID], shortCode)
+	}
+	return nil
+}
+
+func (db *InMemoryDatabase) GetURL(ctx context.Context, shortCode string) (string, error) {
+	longURL, ok := db.urls[shortCode]
+	if !ok {
+		return "", errors.New(utils.ErrURLNotFound)
+	}
+	return longURL, nil
+}
+
+func (db *InMemoryDatabase) SaveClick(ctx context.Context, click models.Click) error {
+	db.clicks[click.ShortCode] = append(db.clicks[click.ShortCode], click)
+	return nil
+}
+
+func (db *InMemoryDatabase) GetClicks(ctx context.Context, shortCode string) ([]models.Click, error) {
+	clicks, ok := db.clicks[shortCode]
+	if !ok {
+		return nil, errors.New(utils.ErrNoClicksFound)
+	}
+	return clicks, nil
+}
+
+func (db *InMemoryDatabase) GetTenantByAPIKey(ctx context.Context, apiKey string) (*models.Tenant, error) {
+	tenant, ok := db.tenants[apiKey]
+	if !ok {
+		return nil, errors.New(utils.ErrInvalidAPIKey)
+	}
+	return &tenant, nil
+}
+
+func (db *InMemoryDatabase) GetURLTenantID(ctx context.Context, shortCode string) (string, error) {
+	// Check if the short URL exists
+	if _, ok := db.urls[shortCode]; !ok {
+		return "", errors.New(utils.ErrURLNotFound)
+	}
+
+	// Check if the short URL is associated with a tenant
+	for tenantID, shortCodes := range db.tenantURLs {
+		for _, sc := range shortCodes {
+			if sc == shortCode {
+				return tenantID, nil
+			}
+		}
+	}
+
+	// If no tenant is associated, return an empty string
+	return "", nil
+}
+
+func (db *InMemoryDatabase) Close() error {
+	return nil
+}
+\n==== END OF ./storage/database.go ====\n
+./storage/database_test.go
+==== START OF ./storage/database_test.go ====
+package storage
+
+import (
+	"context"
+	"testing"
+)
+
+func TestSaveAndGetURL(t *testing.T) {
+	// Setup
+	db, _ := NewDatabase("")
+
+	// Test data
+	shortCode := "abc123"
+	longURL := "https://example.com"
+	tenantID := "tenant-123"
+
+	// Save URL
+	err := db.SaveURL(context.Background(), shortCode, longURL, tenantID)
+	if err != nil {
+		t.Fatalf("SaveURL failed: %v", err)
+	}
+
+	// Get URL
+	retrievedURL, err := db.GetURL(context.Background(), shortCode)
+	if err != nil {
+		t.Fatalf("GetURL failed: %v", err)
+	}
+
+	if retrievedURL != longURL {
+		t.Errorf("Expected URL %s, got %s", longURL, retrievedURL)
+	}
+}
+\n==== END OF ./storage/database_test.go ====\n
+./api/handlers_test.go
+==== START OF ./api/handlers_test.go ====
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/akos011221/url-shortener/models"
+	"github.com/akos011221/url-shortener/service"
+	"github.com/akos011221/url-shortener/storage"
+)
+
+func TestCreateShortURL(t *testing.T) {
+	// Setup
+	db, _ := storage.NewDatabase("")
+	shortener := service.NewShortener(db)
+	analytics := service.NewAnalytics(db)
+	handlers := Handlers{
+		Shortener: shortener,
+		Analytics: analytics,
+	}
+
+	// Test request
+	reqBody := `{"longUrl": "https://example.com"}`
+	req := httptest.NewRequest("POST", "/shorten", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", "api-key-123")
+
+	// Add tenant ID to the request context
+	ctx := context.WithValue(req.Context(), "tenantID", "tenant-123")
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+
+	// Call handler
+	handlers.CreateShortURL(w, req)
+
+	// Check response
+	resp := w.Result()
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+
+	var response models.CreateShortURLResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if response.ShortURL == "" {
+		t.Error("Expected a short URL, got an empty string")
+	}
+}
+\n==== END OF ./api/handlers_test.go ====\n
+./api/middleware_test.go
+==== START OF ./api/middleware_test.go ====
+package api
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/akos011221/url-shortener/storage"
+)
+
+func TestAuthMiddleware(t *testing.T) {
+	// Setup
+	db, _ := storage.NewDatabase("")
+	middleware := AuthMiddleware(db, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Test request with valid API key
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("x-api-key", "api-key-123")
+
+	w := httptest.NewRecorder()
+	middleware.ServeHTTP(w, req)
+
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Result().StatusCode)
+	}
+
+	// Test request with invalid API key
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("x-api-key", "invalid-key")
+
+	w = httptest.NewRecorder()
+	middleware.ServeHTTP(w, req)
+
+	if w.Result().StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected status ode %d, got %d", http.StatusUnauthorized, w.Result().StatusCode)
+	}
+}
+\n==== END OF ./api/middleware_test.go ====\n
+./api/handlers.go
+==== START OF ./api/handlers.go ====
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/akos011221/url-shortener/models"
+	"github.com/akos011221/url-shortener/service"
+	"github.com/akos011221/url-shortener/utils"
+)
+
+type Handlers struct {
+	Shortener *service.Shortener
+	Analytics *service.Analytics
+}
+
+// CreateShortURL handles requests to create a short URL.
+func (h *Handlers) CreateShortURL(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var req models.CreateShortURLRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, utils.ErrInvalidRequestBody)
+		return
+	}
+
+	// Validate request
+	if req.LongURL == "" {
+		utils.WriteError(w, http.StatusBadRequest, utils.ErrLongURLRequired)
+		return
+	}
+
+	// Extract tenant ID from context (set by AuthMiddleware)
+	tenantID := r.Context().Value("tenantID").(string)
+
+	// Create short URL
+	shortURL, err := h.Shortener.CreateShortURL(r.Context(), req.LongURL, tenantID)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, utils.ErrFailedToCreateURL)
+		return
+	}
+
+	// Return response
+	utils.WriteJSON(w, http.StatusCreated, models.CreateShortURLResponse{ShortURL: shortURL})
+}
+
+// Redirect handles requests to redirect to the original URL.
+func (h *Handlers) Redirect(w http.ResponseWriter, r *http.Request) {
+	// Extract short code from URL path
+	shortCode := r.URL.Path[1:]
+
+	// Get long URL
+	longURL, err := h.Shortener.GetLongURL(r.Context(), shortCode)
+	if err != nil {
+		utils.WriteError(w, http.StatusNotFound, utils.ErrURLNotFound)
+		return
+	}
+
+	// Log analytics data
+	go h.Analytics.LogClick(r.Context(), shortCode, r.RemoteAddr, r.UserAgent())
+
+	// Redirect to the long URL
+	http.Redirect(w, r, longURL, http.StatusMovedPermanently)
+}
+
+// GetAnalytics handles requests to retrieve analytics for a short URL.
+func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
+	// Extract short code from URL path
+	shortCode := r.PathValue("shortCode")
+
+	// Extract tenant ID from context (set by AuthMiddleware)
+	tenantID := r.Context().Value("tenantID").(string)
+
+	// Get the short URL's tenant ID (if any)
+	urlTenantID, err := h.Shortener.GetURLTenantID(r.Context(), shortCode)
+	if err != nil {
+		utils.WriteError(w, http.StatusNotFound, utils.ErrURLNotFound)
+		return
+	}
+
+	// Ensure the tenant is authorized to access the analytics
+	if urlTenantID != "" && urlTenantID != tenantID {
+		utils.WriteError(w, http.StatusForbidden, utils.ErrUnauthorizedAccess)
+		return
+	}
+
+	// Get analytics data
+	analytics, err := h.Analytics.GetAnalytics(r.Context(), shortCode)
+	if err != nil {
+		// If no clicks are found, return a 200 OK response with zero clicks
+		if err.Error() == utils.ErrNoClicksFound {
+			utils.WriteJSON(w, http.StatusOK, models.GetAnalyticsResponse{
+				ShortCode: shortCode,
+				Clicks:    0,
+				Details:   []models.Click{},
+			})
+			return
+		}
+
+		// For other errors, return a 500 Internal Server Error
+		utils.WriteError(w, http.StatusInternalServerError, utils.ErrFailedToRetrieveData)
+		return
+	}
+
+	// Return response
+	utils.WriteJSON(w, http.StatusOK, analytics)
+}
+\n==== END OF ./api/handlers.go ====\n
+./api/middleware.go
+==== START OF ./api/middleware.go ====
+package api
+
+import (
+	"log"
+	"net/http"
+	"time"
+	"context"
+
+	"github.com/akos011221/url-shortener/utils"
+	"github.com/akos011221/url-shortener/storage"
+)
+
+// LoggingMiddleware logs incoming requests.
+func LoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		start := time.Now()
+		log.Printf("Started %s %s", r.Method, r.URL.Path)
+		next.ServeHTTP(w, r)
+		log.Printf("Completed %s %s in %v", r.Method, r.URL.Path, time.Since(start))
+	})
+}
+
+// AuthMiddleware authenticates tenants using API keys.
+func AuthMiddleware(db storage.Database, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiKey := r.Header.Get("x-api-key")
+		if apiKey == "" {
+			utils.WriteError(w, http.StatusUnauthorized, utils.ErrAPIKeyRequired)
+			return
+		}
+
+		// Validate API key and get the tenant
+		tenant, err := db.GetTenantByAPIKey(r.Context(), apiKey)
+		if err != nil {
+			utils.WriteError(w, http.StatusUnauthorized, utils.ErrInvalidAPIKey)
+			return
+		}
+
+		// Log the tenant for debugging
+		log.Printf("Authenticated tenant: %s", tenant.Name)
+		
+		// Add tenant ID to the request context
+		ctx := context.WithValue(r.Context(), "tenantID", tenant.ID)
+
+		// Call the next handler
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// RateLimitMiddleware enforces rate limits pers tenant.
+func RateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		
+		// TODO: implement rate limiting logic
+		next.ServeHTTP(w, r)
+	})
+}
+\n==== END OF ./api/middleware.go ====\n
+./service/analytics_test.go
+==== START OF ./service/analytics_test.go ====
+package service
+
+import (
+	"context"
+	"testing"
+
+	"github.com/akos011221/url-shortener/storage"
+)
+
+func TestLogClick(t *testing.T) {
+	// Setup
+	db, _ := storage.NewDatabase("")
+	analytics := NewAnalytics(db)
+
+	// Test data
+	shortCode := "abc123"
+	ipAddress := "127.0.0.1"
+	userAgent := "test-agent"
+
+	// Log a click
+	err := analytics.LogClick(context.Background(), shortCode, ipAddress, userAgent)
+	if err != nil {
+		t.Fatalf("LogClick failed: %v", err)
+	}
+
+	// Verify the click was logged
+	clicks, err := db.GetClicks(context.Background(), shortCode)
+	if err != nil {
+		t.Fatalf("GetClicks failed: %v", err)
+	}
+
+	if len(clicks) != 1 {
+		t.Errorf("Expected 1 click, got %d", len(clicks))
+	}
+
+	click := clicks[0]
+	if click.ShortCode != shortCode || click.IPAddress != ipAddress || click.UserAgent != userAgent {
+		t.Errorf("Click data mismatch: got %+v", click)
+	}
+}
+
+func TestGetAnalytics(t *testing.T) {
+	// Setup
+	db, _ := storage.NewDatabase("")
+	analytics := NewAnalytics(db)
+
+	// Test data
+	shortCode := "abc123"
+	ipAddress := "127.0.0.1"
+	userAgent := "test-agent"
+
+	// Log a click
+	err := analytics.LogClick(context.Background(), shortCode, ipAddress, userAgent)
+	if err != nil {
+		t.Fatalf("LogClick failed: %v", err)
+	}
+
+	// Get analytics
+	response, err := analytics.GetAnalytics(context.Background(), shortCode)
+	if err != nil {
+		t.Fatalf("GetAnalytics failed: %v", err)
+	}
+
+	if response.Clicks != 1 {
+		t.Errorf("Expected 1 click, got %d", response.Clicks)
+	}
+
+	if len(response.Details) != 1 {
+		t.Errorf("Expected 1 click details, got %d", len(response.Details))
+	}
+
+	click := response.Details[0]
+	if click.ShortCode != shortCode || click.IPAddress != ipAddress || click.UserAgent != userAgent {
+		t.Errorf("Click data mismatch: got %+v", click)
+	}
+}
+\n==== END OF ./service/analytics_test.go ====\n
+./service/shortener_test.go
+==== START OF ./service/shortener_test.go ====
+package service
+
+import (
+	"context"
+	"testing"
+
+	"github.com/akos011221/url-shortener/storage"
+)
+
+func TestCreateShortURL(t *testing.T) {
+	// Setup
+	db, _ := storage.NewDatabase("")
+	shortener := NewShortener(db)
+
+	// Test data
+	longURL := "https://example.com"
+	tenantID := "tenant-123"
+
+	// Call method
+	shortURL, err := shortener.CreateShortURL(context.Background(), longURL, tenantID)
+	if err != nil {
+		t.Fatalf("CreateShortURL failed: %v", err)
+	}
+
+	if shortURL == "" {
+		t.Error("Expected a short URL, got an empty string")
+	}
+}
+\n==== END OF ./service/shortener_test.go ====\n
+./service/shortener.go
+==== START OF ./service/shortener.go ====
+package service
+
+import (
+	"context"
+	"math/rand"
+
+	"github.com/akos011221/url-shortener/models"
+	"github.com/akos011221/url-shortener/storage"
+)
+
+type Shortener struct {
+	db storage.Database
+}
+
+func NewShortener(db storage.Database) *Shortener {
+	return &Shortener{db: db}
+}
+
+// CreateShortURL generates a short URL for the given long URL.
+func (s *Shortener) CreateShortURL(ctx context.Context, longURL, tenantID string) (string, error) {
+	// Generate short code (e.g., using Base62 encoding)
+	shortCode := generateShortCode()
+
+	// Store the mapping in the database
+	if err := s.db.SaveURL(ctx, shortCode, longURL, tenantID); err != nil {
+		return "", err
+	}
+
+	return shortCode, nil
+}
+
+// GetLongURL retrieves the long URL for the given short code.
+func (s *Shortener) GetLongURL(ctx context.Context, shortCode string) (string, error) {
+	return s.db.GetURL(ctx, shortCode)
+}
+
+// GetTenantByAPIKey retrieves the tenant associated with the given API key.
+func (s *Shortener) GetTenantByAPIKey(ctx context.Context, apiKey string) (*models.Tenant, error) {
+	return s.db.GetTenantByAPIKey(ctx, apiKey)
+}
+
+// GetURLTenantID retrieves the tenant ID associated with a short URL.
+func (s *Shortener) GetURLTenantID(ctx context.Context, shortCode string) (string, error) {
+	return s.db.GetURLTenantID(ctx, shortCode)
+}
+
+// // generateShortCode generates a unique short code using Base62 encoding.
+func generateShortCode() string {
+	const charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	const codeLength = 6
+
+	// Generate a random short code
+	code := make([]byte, codeLength)
+	for i := range code {
+		code[i] = charset[rand.Intn(len(charset))]
+	}
+
+	return string(code)
+}
+\n==== END OF ./service/shortener.go ====\n
+./service/analytics.go
+==== START OF ./service/analytics.go ====
+package service
+
+import (
+	"context"
+	"time"
+
+	"github.com/akos011221/url-shortener/models"
+	"github.com/akos011221/url-shortener/storage"
+)
+
+type Analytics struct {
+	db storage.Database
+}
+
+func NewAnalytics(db storage.Database) *Analytics {
+	return &Analytics{db: db}
+}
+
+// LogClick records a click on a short URL.
+func (a *Analytics) LogClick(ctx context.Context, shortCode, ipAddress, userAgent string) error {
+	// Create a Click object
+	click := models.Click{
+		ShortCode:	shortCode,
+		IPAddress:	ipAddress,
+		UserAgent:	userAgent,
+		TimeStamp:	time.Now(),
+	}
+
+	// Save the click to the database
+	if err := a.db.SaveClick(ctx, click); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetAnalytics retrieves analytics data for a short URL.
+func (a *Analytics) GetAnalytics(ctx context.Context, shortCode string) (*models.GetAnalyticsResponse, error) {
+	// Get total clicks
+	clicks, err := a.db.GetClicks(ctx, shortCode)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare response
+	response := &models.GetAnalyticsResponse{
+		ShortCode:	shortCode,
+		Clicks:		len(clicks),
+		Details:	clicks,
+	}
+
+	return response, nil
+}
+\n==== END OF ./service/analytics.go ====\n
+./main.go
+==== START OF ./main.go ====
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/akos011221/url-shortener/api"
+	"github.com/akos011221/url-shortener/config"
+	"github.com/akos011221/url-shortener/service"
+	"github.com/akos011221/url-shortener/storage"
+	"github.com/akos011221/url-shortener/utils"
+)
+
+func main() {
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Initialize logger
+	utils.InitLogger(cfg.Env)
+
+	// Initialize database
+	db, err := storage.NewDatabase(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Create services
+	shortenerService := service.NewShortener(db)
+	analyticsService := service.NewAnalytics(db)
+
+	// Create handlers
+	handlers := api.Handlers{
+		Shortener: shortenerService,
+		Analytics: analyticsService,
+	}
+
+	// Create router for public routes
+	router := http.NewServeMux()
+
+	// Public routes (no API key required)
+	router.HandleFunc("GET /{shortCode}", handlers.Redirect) // Redirect short URLs
+
+	// Create router for protected routes
+	protectedRouter := http.NewServeMux()
+
+	// Protected routes (API key required)
+	protectedRouter.HandleFunc("POST /shorten", handlers.CreateShortURL)          
+	protectedRouter.HandleFunc("GET /analytics/{shortCode}", handlers.GetAnalytics)
+
+	// Wrap the protected router with middleware
+	protectedHandler := api.AuthMiddleware(db, protectedRouter)
+	protectedHandler = api.RateLimitMiddleware(protectedHandler)
+	protectedHandler = api.LoggingMiddleware(protectedHandler)
+
+	// Mount the protected router under a prefix
+	router.Handle("/api/", http.StripPrefix("/api", protectedHandler))
+
+	// Wrap the public router with logging and rate limit middleware
+	handler := api.LoggingMiddleware(router)
+	handler = api.RateLimitMiddleware(handler)
+
+	// Start the server
+	server := &http.Server{
+		Addr:    cfg.ServerAddress,
+		Handler: handler,
+	}
+
+	log.Printf("Starting server on %s", cfg.ServerAddress)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+\n==== END OF ./main.go ====\n

@@ -20,10 +20,10 @@ func NewAnalytics(db storage.Database) *Analytics {
 func (a *Analytics) LogClick(ctx context.Context, shortCode, ipAddress, userAgent string) error {
 	// Create a Click object
 	click := models.Click{
-		ShortCode:	shortCode,
-		IPAddress:	ipAddress,
-		UserAgent:	userAgent,
-		TimeStamp:	time.Now(),
+		ShortCode: shortCode,
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+		TimeStamp: time.Now(),
 	}
 
 	// Save the click to the database
@@ -44,9 +44,9 @@ func (a *Analytics) GetAnalytics(ctx context.Context, shortCode string) (*models
 
 	// Prepare response
 	response := &models.GetAnalyticsResponse{
-		ShortCode:	shortCode,
-		Clicks:		len(clicks),
-		Details:	clicks,
+		ShortCode: shortCode,
+		Clicks:    len(clicks),
+		Details:   clicks,
 	}
 
 	return response, nil

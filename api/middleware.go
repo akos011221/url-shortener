@@ -1,13 +1,13 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
-	"context"
 
-	"github.com/akos011221/url-shortener/utils"
 	"github.com/akos011221/url-shortener/storage"
+	"github.com/akos011221/url-shortener/utils"
 )
 
 // LoggingMiddleware logs incoming requests.
@@ -39,7 +39,7 @@ func AuthMiddleware(db storage.Database, next http.Handler) http.Handler {
 
 		// Log the tenant for debugging
 		log.Printf("Authenticated tenant: %s", tenant.Name)
-		
+
 		// Add tenant ID to the request context
 		ctx := context.WithValue(r.Context(), "tenantID", tenant.ID)
 
@@ -51,7 +51,7 @@ func AuthMiddleware(db storage.Database, next http.Handler) http.Handler {
 // RateLimitMiddleware enforces rate limits pers tenant.
 func RateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		
+
 		// TODO: implement rate limiting logic
 		next.ServeHTTP(w, r)
 	})
