@@ -21,7 +21,7 @@ type InMemoryDatabase struct {
 	urls       map[string]string         // shortCode -> longURL
 	clicks     map[string][]models.Click // shortCode -> []Click
 	tenants    map[string]models.Tenant  // apiKey -> Tenant
-	tenantURLs map[string][]string       // tenantID -> []shortCode
+	urlTenants map[string]string	     // shortCode -> tenantID
 }
 
 func NewDatabase(databaseURL string) (Database, error) {
@@ -35,15 +35,14 @@ func NewDatabase(databaseURL string) (Database, error) {
 		urls:       make(map[string]string),
 		clicks:     make(map[string][]models.Click),
 		tenants:    tenants,
-		tenantURLs: make(map[string][]string),
+		urlTenants: make(map[string]string),
 	}, nil
 }
 
 func (db *InMemoryDatabase) SaveURL(ctx context.Context, shortCode, longURL, tenantID string) error {
 	db.urls[shortCode] = longURL
 	if tenantID != "" {
-		// Associate the short URL with the tenant (if provided)
-		db.tenantURLs[tenantID] = append(db.tenantURLs[tenantID], shortCode)
+		db.urlTenants[shortCode] = tenantID
 	}
 	return nil
 }
@@ -78,22 +77,10 @@ func (db *InMemoryDatabase) GetTenantByAPIKey(ctx context.Context, apiKey string
 }
 
 func (db *InMemoryDatabase) GetURLTenantID(ctx context.Context, shortCode string) (string, error) {
-	// Check if the short URL exists
 	if _, ok := db.urls[shortCode]; !ok {
 		return "", utils.ErrURLNotFound
 	}
-
-	// Check if the short URL is associated with a tenant
-	for tenantID, shortCodes := range db.tenantURLs {
-		for _, sc := range shortCodes {
-			if sc == shortCode {
-				return tenantID, nil
-			}
-		}
-	}
-
-	// If no tenant is associated, return an empty string
-	return "", nil
+	return db.urlTenants[shortCode], nil
 }
 
 func (db *InMemoryDatabase) Close() error {
