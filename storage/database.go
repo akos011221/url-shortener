@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 
 	"github.com/akos011221/url-shortener/models"
 	"github.com/akos011221/url-shortener/utils"
@@ -52,7 +51,7 @@ func (db *InMemoryDatabase) SaveURL(ctx context.Context, shortCode, longURL, ten
 func (db *InMemoryDatabase) GetURL(ctx context.Context, shortCode string) (string, error) {
 	longURL, ok := db.urls[shortCode]
 	if !ok {
-		return "", errors.New(utils.ErrURLNotFound)
+		return "", utils.ErrURLNotFound
 	}
 	return longURL, nil
 }
@@ -65,7 +64,7 @@ func (db *InMemoryDatabase) SaveClick(ctx context.Context, click models.Click) e
 func (db *InMemoryDatabase) GetClicks(ctx context.Context, shortCode string) ([]models.Click, error) {
 	clicks, ok := db.clicks[shortCode]
 	if !ok {
-		return nil, errors.New(utils.ErrNoClicksFound)
+		return nil, utils.ErrNoClicksFound
 	}
 	return clicks, nil
 }
@@ -73,7 +72,7 @@ func (db *InMemoryDatabase) GetClicks(ctx context.Context, shortCode string) ([]
 func (db *InMemoryDatabase) GetTenantByAPIKey(ctx context.Context, apiKey string) (*models.Tenant, error) {
 	tenant, ok := db.tenants[apiKey]
 	if !ok {
-		return nil, errors.New(utils.ErrInvalidAPIKey)
+		return nil, utils.ErrInvalidAPIKey
 	}
 	return &tenant, nil
 }
@@ -81,7 +80,7 @@ func (db *InMemoryDatabase) GetTenantByAPIKey(ctx context.Context, apiKey string
 func (db *InMemoryDatabase) GetURLTenantID(ctx context.Context, shortCode string) (string, error) {
 	// Check if the short URL exists
 	if _, ok := db.urls[shortCode]; !ok {
-		return "", errors.New(utils.ErrURLNotFound)
+		return "", utils.ErrURLNotFound
 	}
 
 	// Check if the short URL is associated with a tenant

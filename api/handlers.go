@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/akos011221/url-shortener/models"
@@ -87,7 +88,7 @@ func (h *Handlers) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	analytics, err := h.Analytics.GetAnalytics(r.Context(), shortCode)
 	if err != nil {
 		// If no clicks are found, return a 200 OK response with zero clicks
-		if err.Error() == utils.ErrNoClicksFound {
+		if errors.Is(err, utils.ErrNoClicksFound) {
 			utils.WriteJSON(w, http.StatusOK, models.GetAnalyticsResponse{
 				ShortCode: shortCode,
 				Clicks:    0,
