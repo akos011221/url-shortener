@@ -44,7 +44,7 @@ data:
                       address:
                         socket_address:
                           address: url-shortener.default.svc.cluster.local
-                          port_value: 80
+                          port_value: 3080
     admin:
       access_log_path: /tmp/admin_access.log
       address:
