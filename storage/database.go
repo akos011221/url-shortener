@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 
 	"github.com/akos011221/url-shortener/models"
 	"github.com/akos011221/url-shortener/utils"
